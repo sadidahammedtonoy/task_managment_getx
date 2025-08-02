@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:http/http.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:task_manager/Auth/Controller/controller.dart';
 import 'package:task_manager/Auth/View/signup_signin/signin.dart';
-import '../main.dart';
 
 class NetworkResponse {
   final bool isSuccess;
@@ -19,20 +19,25 @@ class NetworkResponse {
   });
 }
 
-class networkCaller {
+class NetworkCaller extends GetxController {
+  static final NetworkCaller _instance = NetworkCaller._internal();
+  factory NetworkCaller() => _instance;
+  NetworkCaller._internal();
+
   static const String _defaultErrorMessage = 'Something went wrong';
   static const String _unAuthorizeMessage = 'Un-authorized token';
 
-  static Future<NetworkResponse> getRequest({required String url}) async {
+  Future<NetworkResponse> getRequest({required String url}) async {
     try {
       Uri uri = Uri.parse(url);
       final Map<String, String> header = {
         'content-type': 'application/json',
-        'token': AuthController.accessToken ?? '',
+        'token': Get.find<AuthController>().accessToken.value ?? '',
       };
 
       _logRequest(url, null, header);
-      Response response = await get(uri, headers: header);
+      http.Response response = await http.get(uri, headers: header);
+      print(response.statusCode);
       _logResponse(url, response);
 
       if (response.statusCode == 200) {
@@ -43,7 +48,7 @@ class networkCaller {
           body: decodedJson,
         );
       } else if (response.statusCode == 401) {
-        _onUnAuthorize();
+        await _onUnAuthorize();
         return NetworkResponse(
           isSuccess: false,
           statusCode: response.statusCode,
@@ -66,7 +71,7 @@ class networkCaller {
     }
   }
 
-  static Future<NetworkResponse> postRequest({
+  Future<NetworkResponse> postRequest({
     required String url,
     Map<String, String>? body,
     bool isFromLogin = false,
@@ -76,11 +81,11 @@ class networkCaller {
 
       final Map<String, String> headers = {
         'content-type': 'application/json',
-        'token': AuthController.accessToken ?? '',
+        'token': Get.find<AuthController>().accessToken.value ?? '',
       };
 
       _logRequest(url, body, headers);
-      Response response = await post(
+      http.Response response = await http.post(
         uri,
         headers: headers,
         body: jsonEncode(body),
@@ -96,7 +101,7 @@ class networkCaller {
         );
       } else if (response.statusCode == 401) {
         if (isFromLogin == false) {
-          _onUnAuthorize();
+          await _onUnAuthorize();
         }
         return NetworkResponse(
           isSuccess: false,
@@ -120,34 +125,32 @@ class networkCaller {
     }
   }
 
-  static void _logRequest(
-    String url,
-    Map<String, String>? body,
-    Map<String, String>? headers,
-  ) {
+  void _logRequest(
+      String url,
+      Map<String, String>? body,
+      Map<String, String>? headers,
+      ) {
     debugPrint(
       '================== REQUEST ========================\n'
-      'URL: $url\n'
-      'HEADERS: $headers\n'
-      'BODY: $body\n'
-      '=============================================',
+          'URL: $url\n'
+          'HEADERS: $headers\n'
+          'BODY: $body\n'
+          '=============================================',
     );
   }
 
-  static void _logResponse(String url, Response response) {
+  void _logResponse(String url, http.Response response) {
     debugPrint(
       '=================== RESPONSE =======================\n'
-      'URL: $url\n'
-      'STATUS CODE: ${response.statusCode}\n'
-      'BODY: ${response.body}\n'
-      '=============================================',
+          'URL: $url\n'
+          'STATUS CODE: ${response.statusCode}\n'
+          'BODY: ${response.body}\n'
+          '=============================================',
     );
   }
 
-  static Future<void> _onUnAuthorize() async {
-    await AuthController.clearUserData();
-    Navigator.of(
-      MyApp.navigator.currentContext!,
-    ).pushNamedAndRemoveUntil(signin.name, (predicate) => false);
+  Future<void> _onUnAuthorize() async {
+    await Get.find<AuthController>().clearUserData();
+    Get.offAllNamed(signin.name);
   }
 }
