@@ -6,7 +6,7 @@ import '../../Const/assets.dart';
 import '../../Auth/Controller/controller.dart';
 import '../../Features/appbar_navbar/navbar.dart';
 import '../../Features/Background/Background.dart';
-
+final AuthController authController = Get.put(AuthController());
 class SplashScreenController extends GetxController {
   @override
   void onInit() {
@@ -16,7 +16,7 @@ class SplashScreenController extends GetxController {
 
   Future<void> moveToNextScreen() async {
     await Future.delayed(Duration(seconds: 2));
-    bool isLoggedIn = await AuthController.isUserLoggedIn();
+    bool isLoggedIn = await authController.isUserLoggedIn();
     if (isLoggedIn) {
       Get.offNamed(navbar.name);
     } else {
