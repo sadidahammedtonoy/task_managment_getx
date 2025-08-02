@@ -14,6 +14,7 @@ import '../signup_signin/signin.dart';
 
 class EmailvarificationController extends GetxController {
   final TextEditingController emailController = TextEditingController();
+  final NetworkCaller Netcontroller = Get.put(NetworkCaller());
   final GlobalKey<FormState> key = GlobalKey<FormState>();
   var emailisLoading = false.obs;
 
@@ -27,7 +28,7 @@ class EmailvarificationController extends GetxController {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('token') ?? '';
 
-    NetworkResponse response = await networkCaller.getRequest(
+    NetworkResponse response = await Netcontroller.getRequest(
       url: urls.RecoverVerifyEmailUrl(emailController.text.trim()),
     );
     if (response.isSuccess) {
