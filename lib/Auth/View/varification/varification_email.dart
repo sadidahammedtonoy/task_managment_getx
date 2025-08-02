@@ -1,6 +1,7 @@
 import 'package:email_validator/email_validator.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_manager/Auth/View/varification/varification_pin.dart';
 import 'package:task_manager/Features/Global%20Widgets/progressIndicator.dart';
@@ -11,29 +12,74 @@ import '../../../Features/Background/Background.dart';
 import '../../../Features/Global Widgets/snackbar.dart';
 import '../signup_signin/signin.dart';
 
-class Emailvarification extends StatefulWidget {
+class EmailvarificationController extends GetxController {
+  final TextEditingController emailController = TextEditingController();
+  final GlobalKey<FormState> key = GlobalKey<FormState>();
+  var emailisLoading = false.obs;
+
+  void onTapSignInButton() {
+    Get.offAllNamed(signin.name);
+  }
+
+  Future<void> getOtpMail() async {
+    emailisLoading.value = true;
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token') ?? '';
+
+    NetworkResponse response = await networkCaller.getRequest(
+      url: urls.RecoverVerifyEmailUrl(emailController.text.trim()),
+    );
+    if (response.isSuccess) {
+      VerificationDataModel emailVerificationDataModel =
+      VerificationDataModel.fromJson(response.body!);
+
+      String getStatus = emailVerificationDataModel.status ?? '';
+      String getData = emailVerificationDataModel.data ?? '';
+
+      if (getStatus == 'success') {
+        emailisLoading.value = false;
+        SharedPreferences sharedPreferences =
+        await SharedPreferences.getInstance();
+        sharedPreferences.setString('email', emailController.text.trim());
+        emailController.clear();
+        showSnackBarMessage(Get.context!, "$getStatus $getData");
+        await Future.delayed(Duration(seconds: 1));
+        Get.offAllNamed(pinVarification.name);
+      } else {
+        emailisLoading.value = false;
+        showSnackBarMessage(Get.context!, "$getStatus $getData");
+      }
+    } else {
+      emailisLoading.value = false;
+      showSnackBarMessage(Get.context!, response.errorMessage!);
+    }
+
+    emailisLoading.value = false;
+  }
+
+  @override
+  void onClose() {
+    emailController.dispose();
+    super.onClose();
+  }
+}
+
+class Emailvarification extends StatelessWidget {
   const Emailvarification({super.key});
 
   static const String name = '/emailvarification';
 
   @override
-  State<Emailvarification> createState() => _EmailvarificationState();
-}
-
-class _EmailvarificationState extends State<Emailvarification> {
-  final TextEditingController _emailController = TextEditingController();
-  final GlobalKey<FormState> _key = GlobalKey<FormState>();
-  bool _emailisLoading = false;
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(EmailvarificationController());
     return Scaffold(
       body: background(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsetsGeometry.all(25),
+            padding: EdgeInsets.all(25),
             child: Form(
-              key: _key,
+              key: controller.key,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,11 +98,9 @@ class _EmailvarificationState extends State<Emailvarification> {
                       style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
                   TextFormField(
-                    controller: _emailController,
+                    controller: controller.emailController,
                     decoration: InputDecoration(hintText: 'Email'),
                     validator: (String? value) {
                       if (value == null || value.isEmpty) {
@@ -67,27 +111,23 @@ class _EmailvarificationState extends State<Emailvarification> {
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 16),
-
                   Center(
                     child: Column(
                       children: [
-                        Visibility(
-                          visible: _emailisLoading == false,
+                        Obx(() => Visibility(
+                          visible: !controller.emailisLoading.value,
                           replacement: CenteredCircularProgressIndicator(),
                           child: ElevatedButton(
-                            onPressed: () async {
-                              if (_key.currentState!.validate()) {
-                                _getOtpMail();
+                            onPressed: () {
+                              if (controller.key.currentState!.validate()) {
+                                controller.getOtpMail();
                               }
                             },
                             child: Icon(Icons.arrow_circle_right_outlined),
                           ),
-                        ),
-
+                        )),
                         const SizedBox(height: 8),
-
                         RichText(
                           text: TextSpan(
                             text: 'Have account? ',
@@ -104,7 +144,7 @@ class _EmailvarificationState extends State<Emailvarification> {
                                   fontWeight: FontWeight.w700,
                                 ),
                                 recognizer: TapGestureRecognizer()
-                                  ..onTap = _onTapSignInButton,
+                                  ..onTap = controller.onTapSignInButton,
                               ),
                             ],
                           ),
@@ -119,71 +159,5 @@ class _EmailvarificationState extends State<Emailvarification> {
         ),
       ),
     );
-  }
-
-  void _onTapSignInButton() {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      signin.name,
-      (predicate) => false,
-    );
-  }
-
-  Future<void> _getOtpMail() async {
-    _emailisLoading = true;
-    if (mounted) {
-      setState(() {});
-    }
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('token') ?? '';
-
-    NetworkResponse response = await networkCaller.getRequest(
-      url: urls.RecoverVerifyEmailUrl(_emailController.text.trim()),
-    );
-    if (response.isSuccess) {
-      VerificationDataModel emailVerificationDataModel =
-          VerificationDataModel.fromJson(response.body!);
-
-      String getStatus = emailVerificationDataModel.status ?? '';
-      String getData = emailVerificationDataModel.data ?? '';
-
-      if (getStatus == 'success') {
-        _emailisLoading = false;
-        SharedPreferences sharedPreferences =
-            await SharedPreferences.getInstance();
-        sharedPreferences.setString('email', _emailController.text.trim());
-        if (mounted) {
-          _emailController.clear();
-          showSnackBarMessage(context, "$getStatus $getData");
-          await Future.delayed(Duration(seconds: 1));
-          await Navigator.pushNamedAndRemoveUntil(
-            context,
-            pinVarification.name,
-            (predicate) => false,
-          );
-        }
-      } else {
-        if (mounted) {
-          _emailisLoading = false;
-          showSnackBarMessage(context, "$getStatus $getData");
-        }
-      }
-    } else {
-      if (mounted) {
-        _emailisLoading = false;
-        showSnackBarMessage(context, response.errorMessage!);
-      }
-    }
-
-    _emailisLoading = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
   }
 }
