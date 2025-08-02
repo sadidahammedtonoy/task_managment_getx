@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/Network/network.dart';
 import 'package:task_manager/Features/Global%20Widgets/progressIndicator.dart';
 import 'package:task_manager/Features/Global%20Widgets/snackbar.dart';
@@ -6,25 +7,64 @@ import '../../../Const/urls.dart';
 import '../../Background/Background.dart';
 import '../../appbar_navbar/appbar.dart';
 import '../../appbar_navbar/navbar.dart';
+final NetworkCaller conroller = Get.put(NetworkCaller());
+class AddTaskController extends GetxController {
+  final TextEditingController titleTEController = TextEditingController();
+  final TextEditingController descriptionTEController = TextEditingController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  var addNewTaskInProgress = false.obs;
 
-class addTask extends StatefulWidget {
+  void onTapSubmitButton() {
+    if (formKey.currentState!.validate()) {
+      addNewTask();
+    }
+  }
+
+  Future<void> addNewTask() async {
+    addNewTaskInProgress.value = true;
+
+    Map<String, String> requestBody = {
+      'title': titleTEController.text.trim(),
+      'description': descriptionTEController.text.trim(),
+      'status': 'New',
+    };
+
+    NetworkResponse response = await conroller.postRequest(
+      url: urls.AddNewTaskUrl,
+      body: requestBody,
+    );
+
+    addNewTaskInProgress.value = false;
+
+    if (response.isSuccess) {
+      titleTEController.clear();
+      descriptionTEController.clear();
+      showSnackBarMessage(Get.context!, 'Task added successfully');
+      Get.offNamed(navbar.name);
+    } else {
+      showSnackBarMessage(
+        Get.context!,
+        'Failed to add task: ${response.errorMessage!}',
+      );
+    }
+  }
+
+  @override
+  void onClose() {
+    titleTEController.dispose();
+    descriptionTEController.dispose();
+    super.onClose();
+  }
+}
+
+class addTask extends StatelessWidget {
   const addTask({super.key});
 
   static const String name = '/add-new-task';
 
   @override
-  State<addTask> createState() => _addTaskState();
-}
-
-class _addTaskState extends State<addTask> {
-  final TextEditingController _titleTEController = TextEditingController();
-  final TextEditingController _descriptionTEController =
-      TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _addNewTaskInProgress = false;
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(AddTaskController());
     return Scaffold(
       appBar: appbar(),
       body: SingleChildScrollView(
@@ -32,7 +72,7 @@ class _addTaskState extends State<addTask> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Form(
-              key: _formKey,
+              key: controller.formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,7 +84,7 @@ class _addTaskState extends State<addTask> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _titleTEController,
+                    controller: controller.titleTEController,
                     textInputAction: TextInputAction.next,
                     validator: (String? value) {
                       if (value?.trim().isEmpty ?? true) {
@@ -56,7 +96,7 @@ class _addTaskState extends State<addTask> {
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _descriptionTEController,
+                    controller: controller.descriptionTEController,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) {
                       FocusScope.of(context).unfocus();
@@ -71,14 +111,14 @@ class _addTaskState extends State<addTask> {
                     decoration: InputDecoration(hintText: 'Description'),
                   ),
                   const SizedBox(height: 16),
-                  Visibility(
-                    visible: _addNewTaskInProgress == false,
+                  Obx(() => Visibility(
+                    visible: !controller.addNewTaskInProgress.value,
                     replacement: CenteredCircularProgressIndicator(),
                     child: ElevatedButton(
-                      onPressed: _onTapSubmitButton,
+                      onPressed: controller.onTapSubmitButton,
                       child: Icon(Icons.arrow_circle_right_outlined),
                     ),
-                  ),
+                  )),
                 ],
               ),
             ),
@@ -86,52 +126,5 @@ class _addTaskState extends State<addTask> {
         ),
       ),
     );
-  }
-
-  _onTapSubmitButton() {
-    if (_formKey.currentState!.validate()) {
-      _addNewTask();
-    }
-  }
-
-  Future<void> _addNewTask() async {
-    _addNewTaskInProgress = true;
-    setState(() {});
-
-    Map<String, String> requestbody = {
-      'title': _titleTEController.text.trim(),
-      'description': _descriptionTEController.text.trim(),
-      'status': 'New',
-    };
-
-    NetworkResponse response = await networkCaller.postRequest(
-      url: urls.AddNewTaskUrl,
-      body: requestbody,
-    );
-
-    _addNewTaskInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-
-    if (response.isSuccess) {
-      _titleTEController.clear();
-      _descriptionTEController.clear();
-
-      showSnackBarMessage(context, 'Task added successfully');
-      Navigator.pushReplacementNamed(context, navbar.name);
-    } else {
-      showSnackBarMessage(
-        context,
-        'Failed to add task: ${response.errorMessage!}',
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _titleTEController.dispose();
-    _descriptionTEController.dispose();
-    super.dispose();
   }
 }

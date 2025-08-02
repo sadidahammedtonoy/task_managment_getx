@@ -1,81 +1,76 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/Auth/Controller/controller.dart';
 import 'package:task_manager/Auth/View/signup_signin/signin.dart';
 import 'package:task_manager/Features/Task_managment/View/updateProfile.dart';
-
 import '../Global Widgets/snackbar.dart';
 
-class appbar extends StatefulWidget implements PreferredSizeWidget {
+class AppbarController extends GetxController {
+  void onTapLogOutButton() async {
+    AuthController controller = Get.find<AuthController>();
+    await controller.clearUserData();
+    Get.offAllNamed(signin.name);
+  }
+
+  void onTapProfileBar() {
+    final currentRoute = Get.currentRoute;
+
+    if (currentRoute == profileUpdate.name) {
+      showSnackBarMessage(Get.context!, 'You are already on the profile page');
+    } else {
+      Get.toNamed(profileUpdate.name);
+    }
+  }
+}
+
+class appbar extends StatelessWidget implements PreferredSizeWidget {
   const appbar({super.key});
 
   @override
-  State<appbar> createState() => _appbarState();
-
-  @override
   Size get preferredSize => Size.fromHeight(kToolbarHeight);
-}
 
-class _appbarState extends State<appbar> {
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(AppbarController());
+    final authController = Get.find<AuthController>();
+
     return AppBar(
       backgroundColor: Colors.blue,
-
       title: GestureDetector(
-        onTap: () => _onTapProfileBar(context),
+        onTap: controller.onTapProfileBar,
         child: Row(
           children: [
-            CircleAvatar(
-              backgroundImage:
-              AuthController.userModel?.photo == null
+            Obx(() => CircleAvatar(
+              backgroundImage: authController.userModel.value?.photo == null
                   ? null
                   : MemoryImage(
-                base64Decode(AuthController.userModel!.photo!),
+                base64Decode(authController.userModel.value!.photo!),
               ),
-            ),
+            )),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
+              child: Obx(() => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    AuthController.userModel!.Fullname,
+                    authController.userModel.value?.Fullname ?? '',
                     style: TextStyle(fontSize: 18, color: Colors.white),
                   ),
                   Text(
-                    AuthController.userModel!.email,
+                    authController.userModel.value?.email ?? '',
                     style: TextStyle(fontSize: 12, color: Colors.white),
                   ),
                 ],
-              ),
+              )),
             ),
-            IconButton(onPressed: _onTapLogOutButton, icon: Icon(Icons.logout)),
+            IconButton(
+              onPressed: controller.onTapLogOutButton,
+              icon: Icon(Icons.logout),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _onTapLogOutButton() async {
-    await AuthController.clearUserData();
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      signin.name,
-      (predicate) => false,
-    );
-  }
-
-  void _onTapProfileBar(BuildContext context) {
-    final currentRoute = ModalRoute.of(context)?.settings.name;
-
-    if (currentRoute == profileUpdate.name) {
-      showSnackBarMessage(context, 'You are already on the profile page');
-    } else {
-      // Navigate to profile page
-      Navigator.pushNamed(context, profileUpdate.name);
-    }
   }
 }
