@@ -15,6 +15,8 @@ class SignupController extends GetxController {
   final TextEditingController lastNameTEController = TextEditingController();
   final TextEditingController phoneTEController = TextEditingController();
   final TextEditingController passwordTEController = TextEditingController();
+  final NetworkCaller Netcontroller = Get.put(NetworkCaller());
+
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   var signUpInProgress = false.obs;
   var obscurePassword = true.obs;
@@ -44,7 +46,7 @@ class SignupController extends GetxController {
       "password": passwordTEController.text,
     };
 
-    NetworkResponse response = await networkCaller.postRequest(
+    NetworkResponse response = await Netcontroller.postRequest(
       url: urls.SignupUrl,
       body: requestBody,
     );

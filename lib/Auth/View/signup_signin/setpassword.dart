@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:task_manager/Auth/Model/varificationModel.dart';
 import 'package:task_manager/Auth/View/signup_signin/signin.dart';
@@ -9,33 +10,89 @@ import '../../../Features/Background/Background.dart';
 import '../../../Features/Global Widgets/snackbar.dart';
 import '../../../Const/urls.dart';
 
-class Setpassword extends StatefulWidget {
+class SetpasswordController extends GetxController {
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+  var resetPasswordInProgress = false.obs;
+  var obscurePassword = true.obs;
+  var confirmObscurePassword = true.obs;
+
+  void togglePasswordVisibility() {
+    obscurePassword.value = !obscurePassword.value;
+  }
+
+  void toggleConfirmPasswordVisibility() {
+    confirmObscurePassword.value = !confirmObscurePassword.value;
+  }
+
+  void onTapSignInButton() {
+    Get.offAllNamed(signin.name);
+  }
+
+  Future<void> resetPassword() async {
+    resetPasswordInProgress.value = true;
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    Map<String, String> requestBody = {
+      "email": prefs.getString('email') ?? '',
+      "OTP": prefs.getString('UserOtp') ?? '',
+      "password": confirmPasswordController.text,
+    };
+    NetworkResponse response = await Get.find<NetworkCaller>().postRequest(
+      url: urls.ResetPasswordUrl,
+      body: requestBody,
+      isFromLogin: false,
+    );
+
+    if (response.isSuccess) {
+      VerificationDataModel passwordResetVerificationDataModel =
+      VerificationDataModel.fromJson(response.body!);
+
+      String getStatus = passwordResetVerificationDataModel.status ?? '';
+      String getData = passwordResetVerificationDataModel.data ?? '';
+
+      if (getStatus == 'success') {
+        passwordController.clear();
+        confirmPasswordController.clear();
+        showSnackBarMessage(Get.context!, "$getStatus $getData");
+        showSnackBarMessage(Get.context!, 'Please Sign In With New Password');
+        await Future.delayed(Duration(seconds: 1));
+        Get.offAllNamed(signin.name);
+      } else {
+        showSnackBarMessage(Get.context!, "$getStatus $getData");
+      }
+    } else {
+      showSnackBarMessage(Get.context!, response.errorMessage!);
+    }
+
+    resetPasswordInProgress.value = false;
+  }
+
+  @override
+  void onClose() {
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.onClose();
+  }
+}
+
+class Setpassword extends StatelessWidget {
   const Setpassword({super.key});
 
   static const String name = '/setpassword';
 
   @override
-  State<Setpassword> createState() => _SetpasswordState();
-}
-
-class _SetpasswordState extends State<Setpassword> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _ConfirmpasswordController =
-      TextEditingController();
-  bool _resetPasswordInProgress = false;
-  bool _obscurePassword = true;
-  bool _ConfirmobscurePassword = true;
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(SetpasswordController());
     return Scaffold(
       body: background(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsetsGeometry.all(20),
+            padding: EdgeInsets.all(20),
             child: Form(
-              key: _formKey,
+              key: controller.formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,30 +102,24 @@ class _SetpasswordState extends State<Setpassword> {
                     'Set Password',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-
                   const SizedBox(height: 8),
                   Text(
                     'Minimum Length password 8 characters with Latter and number combination',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(height: 24),
-
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
+                  Obx(() => TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.obscurePassword.value,
                     decoration: InputDecoration(
                       labelText: 'Password',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
+                          controller.obscurePassword.value
                               ? Icons.visibility_off
                               : Icons.visibility,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                        onPressed: controller.togglePasswordVisibility,
                       ),
                     ),
                     validator: (String? value) {
@@ -79,56 +130,48 @@ class _SetpasswordState extends State<Setpassword> {
                       }
                       return null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 8),
-
-                  TextFormField(
-                    controller: _ConfirmpasswordController,
-                    obscureText: _ConfirmobscurePassword,
+                  Obx(() => TextFormField(
+                    controller: controller.confirmPasswordController,
+                    obscureText: controller.confirmObscurePassword.value,
                     decoration: InputDecoration(
                       labelText: 'Confirm Password',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _ConfirmobscurePassword
+                          controller.confirmObscurePassword.value
                               ? Icons.visibility_off
                               : Icons.visibility,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _ConfirmobscurePassword = !_ConfirmobscurePassword;
-                          });
-                        },
+                        onPressed: controller.toggleConfirmPasswordVisibility,
                       ),
                     ),
-
                     validator: (String? value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password';
                       } else if (value.length < 6) {
                         return 'Password must be at least 6 characters';
-                      } else if (_passwordController.text !=
-                          _ConfirmpasswordController.text) {
+                      } else if (controller.passwordController.text !=
+                          controller.confirmPasswordController.text) {
                         return 'Passwords do not match';
                       }
                       return null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 16),
-                  Visibility(
-                    visible: _resetPasswordInProgress == false,
+                  Obx(() => Visibility(
+                    visible: !controller.resetPasswordInProgress.value,
                     replacement: CenteredCircularProgressIndicator(),
                     child: ElevatedButton(
                       onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          _resetPassword();
+                        if (controller.formKey.currentState!.validate()) {
+                          controller.resetPassword();
                         }
                       },
                       child: Text('Confirm'),
                     ),
-                  ),
-
+                  )),
                   const SizedBox(height: 32),
-
                   Center(
                     child: Column(
                       children: [
@@ -148,7 +191,7 @@ class _SetpasswordState extends State<Setpassword> {
                                   fontWeight: FontWeight.w700,
                                 ),
                                 recognizer: TapGestureRecognizer()
-                                  ..onTap = _onTapSignInButton,
+                                  ..onTap = controller.onTapSignInButton,
                               ),
                             ],
                           ),
@@ -163,78 +206,5 @@ class _SetpasswordState extends State<Setpassword> {
         ),
       ),
     );
-  }
-
-  void _onTapSignInButton() {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      signin.name,
-      (predicate) => false,
-    );
-  }
-
-  Future<void> _resetPassword() async {
-    _resetPasswordInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    Map<String, String> requestBody = {
-      "email": prefs.getString('email') ?? '',
-      "OTP": prefs.getString('UserOtp') ?? '',
-      "password": _ConfirmpasswordController.text,
-    };
-    NetworkResponse response = await networkCaller.postRequest(
-      url: urls.ResetPasswordUrl,
-      body: requestBody,
-      isFromLogin: false,
-    );
-
-    if (response.isSuccess) {
-      VerificationDataModel PasswordResetVerificationDataModel =
-          VerificationDataModel.fromJson(response.body!);
-
-      String getStatus = PasswordResetVerificationDataModel.status ?? '';
-      String getData = PasswordResetVerificationDataModel.data ?? '';
-
-      if (getStatus == 'success') {
-        _resetPasswordInProgress = false;
-        if (mounted) {
-          _passwordController.clear();
-          _ConfirmpasswordController.clear();
-          showSnackBarMessage(context, "$getStatus $getData");
-          showSnackBarMessage(context, 'Please Sign In With New Password');
-          await Future.delayed(Duration(seconds: 1));
-          await Navigator.pushNamedAndRemoveUntil(
-            context,
-            signin.name,
-            (predicate) => false,
-          );
-        }
-      } else {
-        if (mounted) {
-          _resetPasswordInProgress = false;
-          showSnackBarMessage(context, "$getStatus $getData");
-        }
-      }
-    } else {
-      if (mounted) {
-        _resetPasswordInProgress = false;
-        showSnackBarMessage(context, response.errorMessage!);
-      }
-    }
-
-    _resetPasswordInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    _ConfirmpasswordController.dispose();
-    super.dispose();
   }
 }

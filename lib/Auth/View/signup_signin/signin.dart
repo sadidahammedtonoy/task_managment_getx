@@ -16,6 +16,8 @@ import 'signup.dart';
 class SigninController extends GetxController {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final NetworkCaller Netcontroller = Get.put(NetworkCaller());
+  AuthController controller = Get.find<AuthController>();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   var signInProgress = false.obs;
   var obscurePassword = true.obs;
@@ -45,7 +47,7 @@ class SigninController extends GetxController {
       "email": emailController.text.trim(),
       "password": passwordController.text,
     };
-    NetworkResponse response = await networkCaller.postRequest(
+    NetworkResponse response = await Netcontroller.postRequest(
       url: urls.LoginUrl,
       body: requestBody,
       isFromLogin: true,
@@ -55,7 +57,7 @@ class SigninController extends GetxController {
       UserModel userModel = UserModel.fromJson(response.body!['data']);
       String token = response.body!['token'];
 
-      await AuthController.saveUserData(userModel, token);
+      await controller.saveUserData(userModel, token);
       Get.offAllNamed(navbar.name);
     } else {
       showSnackBarMessage(Get.context!, response.errorMessage!);
@@ -72,14 +74,14 @@ class SigninController extends GetxController {
   }
 }
 
-class signin extends StatelessWidget {
+class signin extends GetView<SigninController> {
   const signin({super.key});
 
   static const String name = '/sign-in';
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SigninController());
+    Get.put(SigninController());
     return Scaffold(
       body: background(
         child: SingleChildScrollView(
