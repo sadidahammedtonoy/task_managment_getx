@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/Auth/Controller/controller.dart';
 import 'package:task_manager/Auth/Model/authModel.dart';
 import 'package:task_manager/Features/appbar_navbar/navbar.dart';
@@ -12,32 +13,80 @@ import '../../../Const/urls.dart';
 import '../varification/varification_email.dart';
 import 'signup.dart';
 
-class signin extends StatefulWidget {
+class SigninController extends GetxController {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  var signInProgress = false.obs;
+  var obscurePassword = true.obs;
+
+  void togglePasswordVisibility() {
+    obscurePassword.value = !obscurePassword.value;
+  }
+
+  void onTapSignInButton() {
+    if (formKey.currentState!.validate()) {
+      signIn();
+    }
+  }
+
+  void onTapForgetPassword() {
+    Get.toNamed(Emailvarification.name);
+  }
+
+  void onTapSignUpButton() {
+    Get.toNamed(signup.name);
+  }
+
+  Future<void> signIn() async {
+    signInProgress.value = true;
+
+    Map<String, String> requestBody = {
+      "email": emailController.text.trim(),
+      "password": passwordController.text,
+    };
+    NetworkResponse response = await networkCaller.postRequest(
+      url: urls.LoginUrl,
+      body: requestBody,
+      isFromLogin: true,
+    );
+
+    if (response.isSuccess) {
+      UserModel userModel = UserModel.fromJson(response.body!['data']);
+      String token = response.body!['token'];
+
+      await AuthController.saveUserData(userModel, token);
+      Get.offAllNamed(navbar.name);
+    } else {
+      showSnackBarMessage(Get.context!, response.errorMessage!);
+    }
+
+    signInProgress.value = false;
+  }
+
+  @override
+  void onClose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.onClose();
+  }
+}
+
+class signin extends StatelessWidget {
   const signin({super.key});
 
   static const String name = '/sign-in';
 
   @override
-  State<signin> createState() => _signinState();
-}
-
-class _signinState extends State<signin> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _signInProgress = false;
-  bool _obscurePassword = true;
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(SigninController());
     return Scaffold(
       body: background(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsetsGeometry.all(20),
+            padding: EdgeInsets.all(20),
             child: Form(
-              key: _formKey,
+              key: controller.formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,10 +97,8 @@ class _signinState extends State<signin> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 24),
-
-                  const SizedBox(height: 24),
                   TextFormField(
-                    controller: _emailController,
+                    controller: controller.emailController,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(hintText: 'Email'),
                     validator: (String? value) {
@@ -63,57 +110,48 @@ class _signinState extends State<signin> {
                     },
                   ),
                   const SizedBox(height: 8),
-
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
+                  Obx(() => TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.obscurePassword.value,
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
                       hintText: 'Password',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
+                          controller.obscurePassword.value
                               ? Icons.visibility_off
                               : Icons.visibility,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                        onPressed: controller.togglePasswordVisibility,
                       ),
                     ),
-
                     validator: (String? value) {
                       if ((value?.length ?? 0) <= 6) {
                         return 'Enter a valid password';
                       }
                       return null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 16),
-                  Visibility(
-                    visible: _signInProgress == false,
+                  Obx(() => Visibility(
+                    visible: !controller.signInProgress.value,
                     replacement: CenteredCircularProgressIndicator(),
                     child: ElevatedButton(
-                      onPressed: _onTapSignInButton,
+                      onPressed: controller.onTapSignInButton,
                       child: Icon(Icons.arrow_circle_right_outlined),
                     ),
-                  ),
-
+                  )),
                   const SizedBox(height: 32),
-
                   Center(
                     child: Column(
                       children: [
                         TextButton(
-                          onPressed: _onTapForgetPassword,
+                          onPressed: controller.onTapForgetPassword,
                           child: Text(
                             'Forget Password?',
                             style: TextStyle(color: Colors.grey),
                           ),
                         ),
-
                         RichText(
                           text: TextSpan(
                             text: 'Don\'t have an account? ',
@@ -129,7 +167,7 @@ class _signinState extends State<signin> {
                                   fontWeight: FontWeight.bold,
                                 ),
                                 recognizer: TapGestureRecognizer()
-                                  ..onTap = _onTapSignUpButton,
+                                  ..onTap = controller.onTapSignUpButton,
                               ),
                             ],
                           ),
@@ -144,67 +182,5 @@ class _signinState extends State<signin> {
         ),
       ),
     );
-  }
-
-  void _onTapSignInButton() {
-    if (_formKey.currentState!.validate()) {
-      _signIn();
-    }
-  }
-
-  void _onTapForgetPassword() {
-    Navigator.pushNamed(context, Emailvarification.name);
-  }
-
-  void _onTapSignUpButton() {
-    Navigator.pushNamed(context, signup.name);
-  }
-
-  Future<void> _signIn() async {
-    _signInProgress = true;
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    Map<String, String> requestBody = {
-      "email": _emailController.text.trim(),
-      "password": _passwordController.text,
-    };
-    NetworkResponse response = await networkCaller.postRequest(
-      url: urls.LoginUrl,
-      body: requestBody,
-      isFromLogin: true,
-    );
-
-    if (response.isSuccess) {
-      UserModel userModel = UserModel.fromJson(response.body!['data']);
-      String token = response.body!['token'];
-
-      await AuthController.saveUserData(userModel, token);
-      // showSnackBarMessage(context, 'Login successful');
-
-      await Navigator.pushNamedAndRemoveUntil(
-        context,
-        navbar.name,
-        (predicate) => false,
-      );
-    } else {
-      if (mounted) {
-        showSnackBarMessage(context, response.errorMessage!);
-      }
-    }
-
-    _signInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 }
