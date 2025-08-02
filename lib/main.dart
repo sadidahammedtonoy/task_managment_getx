@@ -10,6 +10,7 @@ import 'package:task_manager/Features/Task_managment/View/viewTask.dart';
 import 'Auth/View/varification/varification_email.dart';
 import 'Const/theme.dart';
 import 'Splash/View/SpalashScreen.dart';
+import 'package:get/get.dart';
 
 void main() {
   runApp(MyApp());
@@ -26,13 +27,13 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: MyApp.navigator,
       theme: CustomTheme.customTheme,
       initialRoute: '/',
       routes: {
-        SpalashScreen.name: (context) => SpalashScreen(),
+        SplashScreen.name: (context) => SplashScreen(),
         signin.name: (context) => signin(),
         signup.name: (context) => signup(),
         Emailvarification.name: (context) => Emailvarification(),

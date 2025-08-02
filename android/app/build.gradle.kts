@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.cse.gb.task_manager"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
 
     defaultConfig {
         applicationId = "com.cse.gb.task_manager"
