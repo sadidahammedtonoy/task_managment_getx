@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:email_validator/email_validator.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:task_manager/Auth/Model/authModel.dart';
 import '../../../Const/urls.dart';
@@ -12,40 +13,125 @@ import '../../Background/Background.dart';
 import '../../Global Widgets/snackbar.dart';
 import '../../appbar_navbar/appbar.dart';
 
-class profileUpdate extends StatefulWidget {
+class ProfileUpdateController extends GetxController {
+  final TextEditingController emailTEController = TextEditingController();
+  final TextEditingController firstNameTEController = TextEditingController();
+  final TextEditingController lastNameTEController = TextEditingController();
+  final TextEditingController phoneTEController = TextEditingController();
+  final TextEditingController passwordTEController = TextEditingController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final ImagePicker _imagePicker = ImagePicker();
+  var selectedImage = Rxn<XFile>();
+  var updateProfileInProgress = false.obs;
+  var obscurePassword = true.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    emailTEController.text = AuthController().userModel.value?.email ?? '';
+    firstNameTEController.text = AuthController().userModel.value?.firstName ?? '';
+    lastNameTEController.text = AuthController().userModel.value?.lastName ?? '';
+    phoneTEController.text = AuthController().userModel.value?.mobile ?? '';
+  }
+
+  void togglePasswordVisibility() {
+    obscurePassword.value = !obscurePassword.value;
+  }
+
+  Future<void> onTapPhotoPicker() async {
+    final XFile? pickedImage = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
+
+    if (pickedImage != null) {
+      final int fileSizeInBytes = await pickedImage.length();
+      final double fileSizeInKB = fileSizeInBytes / 1024;
+
+      if (fileSizeInKB > 64) {
+        showSnackBarMessage(
+          Get.context!,
+          'Image is too large. Max allowed size is 64KB.',
+        );
+      } else {
+        selectedImage.value = pickedImage;
+      }
+    } else {
+      showSnackBarMessage(Get.context!, 'No image selected');
+    }
+  }
+
+  void onTapSubmitButton() {
+    if (formKey.currentState!.validate()) {
+      updateProfile();
+    }
+  }
+
+  Future<void> updateProfile() async {
+    updateProfileInProgress.value = true;
+
+    Uint8List? imageBytes;
+
+    Map<String, String> requestBody = {
+      'email': emailTEController.text.trim(),
+      'firstName': firstNameTEController.text.trim(),
+      'lastName': lastNameTEController.text.trim(),
+      'mobile': phoneTEController.text.trim(),
+    };
+
+    if (passwordTEController.text.isNotEmpty) {
+      requestBody['password'] = passwordTEController.text;
+    }
+    if (selectedImage.value != null) {
+      imageBytes = await selectedImage.value!.readAsBytes();
+      requestBody['photo'] = base64Encode(imageBytes);
+    }
+
+    NetworkResponse response = await Get.find<NetworkCaller>().postRequest(
+      url: urls.UpdateProfileUrl,
+      body: requestBody,
+    );
+
+    updateProfileInProgress.value = false;
+
+    if (response.isSuccess) {
+      UserModel userModel = UserModel(
+        id: AuthController().userModel.value!.id,
+        email: emailTEController.text.trim(),
+        firstName: firstNameTEController.text.trim(),
+        lastName: lastNameTEController.text.trim(),
+        mobile: phoneTEController.text.trim(),
+        photo: imageBytes == null
+            ? AuthController().userModel.value!.photo
+            : base64Encode(imageBytes),
+      );
+      await AuthController().updateUserData(userModel);
+
+      passwordTEController.clear();
+      showSnackBarMessage(Get.context!, 'Profile updated');
+    } else {
+      showSnackBarMessage(Get.context!, response.errorMessage!);
+    }
+  }
+
+  @override
+  void onClose() {
+    emailTEController.dispose();
+    firstNameTEController.dispose();
+    lastNameTEController.dispose();
+    phoneTEController.dispose();
+    passwordTEController.dispose();
+    super.onClose();
+  }
+}
+
+class profileUpdate extends StatelessWidget {
   const profileUpdate({super.key});
 
   static const String name = '/update-profile';
 
   @override
-  State<profileUpdate> createState() => _profileUpdateState();
-}
-
-class _profileUpdateState extends State<profileUpdate> {
-  final TextEditingController _emailTEController = TextEditingController();
-  final TextEditingController _firstNameTEController = TextEditingController();
-  final TextEditingController _lastNameTEController = TextEditingController();
-  final TextEditingController _phoneTEController = TextEditingController();
-  final TextEditingController _passwordTEController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final ImagePicker _imagePicker = ImagePicker();
-  XFile? _selectedImage;
-  bool _updateProfileInProgress = false;
-  bool _obscurePassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-    if (mounted) {
-      _emailTEController.text = AuthController.userModel?.email ?? '';
-      _firstNameTEController.text = AuthController.userModel?.firstName ?? '';
-      _lastNameTEController.text = AuthController.userModel?.lastName ?? '';
-      _phoneTEController.text = AuthController.userModel?.mobile ?? '';
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(ProfileUpdateController());
     return Scaffold(
       appBar: appbar(),
       body: background(
@@ -53,7 +139,7 @@ class _profileUpdateState extends State<profileUpdate> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Form(
-              key: _formKey,
+              key: controller.formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,13 +150,11 @@ class _profileUpdateState extends State<profileUpdate> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 24),
-                  _buildPhotoPicker(),
-
+                  _buildPhotoPicker(controller),
                   const SizedBox(height: 8),
-                  // TODO: Design photo selector
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _emailTEController,
+                    controller: controller.emailTEController,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(hintText: 'Email'),
                     validator: (String? value) {
@@ -83,7 +167,7 @@ class _profileUpdateState extends State<profileUpdate> {
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _firstNameTEController,
+                    controller: controller.firstNameTEController,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(hintText: 'First name'),
                     validator: (String? value) {
@@ -95,7 +179,7 @@ class _profileUpdateState extends State<profileUpdate> {
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _lastNameTEController,
+                    controller: controller.lastNameTEController,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(hintText: 'Last name'),
                     validator: (String? value) {
@@ -107,7 +191,7 @@ class _profileUpdateState extends State<profileUpdate> {
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _phoneTEController,
+                    controller: controller.phoneTEController,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(hintText: 'Mobile'),
@@ -119,22 +203,18 @@ class _profileUpdateState extends State<profileUpdate> {
                     },
                   ),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _passwordTEController,
-                    obscureText: _obscurePassword,
+                  Obx(() => TextFormField(
+                    controller: controller.passwordTEController,
+                    obscureText: controller.obscurePassword.value,
                     decoration: InputDecoration(
                       hintText: 'Password',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
+                          controller.obscurePassword.value
                               ? Icons.visibility_off
                               : Icons.visibility,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                        onPressed: controller.togglePasswordVisibility,
                       ),
                     ),
                     validator: (String? value) {
@@ -144,16 +224,16 @@ class _profileUpdateState extends State<profileUpdate> {
                       }
                       return null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 16),
-                  Visibility(
-                    visible: _updateProfileInProgress == false,
+                  Obx(() => Visibility(
+                    visible: !controller.updateProfileInProgress.value,
                     replacement: CenteredCircularProgressIndicator(),
                     child: ElevatedButton(
-                      onPressed: _onTapSubmitButton,
+                      onPressed: controller.onTapSubmitButton,
                       child: Icon(Icons.arrow_circle_right_outlined),
                     ),
-                  ),
+                  )),
                 ],
               ),
             ),
@@ -163,9 +243,9 @@ class _profileUpdateState extends State<profileUpdate> {
     );
   }
 
-  Widget _buildPhotoPicker() {
+  Widget _buildPhotoPicker(ProfileUpdateController controller) {
     return GestureDetector(
-      onTap: _onTapPhotoPicker,
+      onTap: controller.onTapPhotoPicker,
       child: Container(
         height: 50,
         width: double.maxFinite,
@@ -195,111 +275,16 @@ class _profileUpdateState extends State<profileUpdate> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              _selectedImage == null ? 'Select image' : _selectedImage!.name,
+            Obx(() => Text(
+              controller.selectedImage.value == null
+                  ? 'Select image'
+                  : controller.selectedImage.value!.name,
               maxLines: 1,
               style: TextStyle(overflow: TextOverflow.ellipsis),
-            ),
+            )),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _onTapPhotoPicker() async {
-    final XFile? pickedImage = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-    );
-
-    if (pickedImage != null) {
-      final int fileSizeInBytes = await pickedImage.length();
-      final double fileSizeInKB = fileSizeInBytes / 1024;
-
-      if (fileSizeInKB > 64) {
-        showSnackBarMessage(
-          context,
-          'Image is too large. Max allowed size is 64KB.',
-        );
-        return;
-      } else {
-        _selectedImage = pickedImage;
-        setState(() {});
-      }
-    } else {
-      showSnackBarMessage(context, 'No image selected');
-    }
-  }
-
-  void _onTapSubmitButton() {
-    if (_formKey.currentState!.validate()) {
-      _updateProfile();
-    }
-  }
-
-  Future<void> _updateProfile() async {
-    _updateProfileInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
-    Uint8List? imageBytes;
-
-    Map<String, String> requestBody = {
-      'email': _emailTEController.text.trim(),
-      'firstName': _firstNameTEController.text.trim(),
-      'lastName': _lastNameTEController.text.trim(),
-      'mobile': _phoneTEController.text.trim(),
-    };
-
-    if (_passwordTEController.text.isNotEmpty) {
-      requestBody['password'] = _passwordTEController.text;
-    }
-    if (_selectedImage != null) {
-      imageBytes = await _selectedImage!.readAsBytes();
-      requestBody['photo'] = base64Encode(imageBytes);
-    }
-
-    NetworkResponse response = await networkCaller.postRequest(
-      url: urls.UpdateProfileUrl,
-      body: requestBody,
-    );
-
-    _updateProfileInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-
-    if (response.isSuccess) {
-      UserModel userModel = UserModel(
-        id: AuthController.userModel!.id,
-        email: _emailTEController.text.trim(),
-        firstName: _firstNameTEController.text.trim(),
-        lastName: _lastNameTEController.text.trim(),
-        mobile: _phoneTEController.text.trim(),
-        photo: imageBytes == null
-            ? AuthController.userModel!.photo
-            : base64Encode(imageBytes),
-      );
-      await AuthController.updateUserData(userModel);
-
-      _passwordTEController.clear();
-      if (mounted) {
-        showSnackBarMessage(context, 'Profile updated');
-        setState(() {});
-      }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(context, response.errorMessage!);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _emailTEController.dispose();
-    _firstNameTEController.dispose();
-    _lastNameTEController.dispose();
-    _phoneTEController.dispose();
-    _passwordTEController.dispose();
-    super.dispose();
   }
 }
