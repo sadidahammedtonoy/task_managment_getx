@@ -14,6 +14,8 @@ import 'package:pin_code_fields/pin_code_fields.dart';
 
 class PinVarificationController extends GetxController {
   final TextEditingController otpTEController = TextEditingController();
+  final NetworkCaller Netcontroller = Get.put(NetworkCaller());
+
   final GlobalKey<FormState> key = GlobalKey<FormState>();
   var otpisLoading = false.obs;
 
@@ -28,7 +30,7 @@ class PinVarificationController extends GetxController {
     String? email = sharedPreferences.getString('email') ?? '';
     await sharedPreferences.setString('UserOtp', otpTEController.text.trim());
 
-    NetworkResponse response = await networkCaller.getRequest(
+    NetworkResponse response = await Netcontroller.getRequest(
       url: urls.VeriftOtpdUrl(email, otpTEController.text.trim()),
     );
     if (response.isSuccess) {
