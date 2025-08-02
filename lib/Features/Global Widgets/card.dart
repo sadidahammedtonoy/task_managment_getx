@@ -5,6 +5,9 @@ import 'date.dart';
 import '../../../Const/urls.dart';
 import 'progressIndicator.dart';
 import 'snackbar.dart';
+import 'package:get/get.dart';
+
+final NetworkCaller Netcontroller = Get.put(NetworkCaller());
 
 enum TaskType { tNew, progress, completed, cancelled }
 
@@ -188,8 +191,8 @@ class _cardState extends State<card> {
       setState(() {});
     }
 
-    NetworkResponse response = await networkCaller.getRequest(
-      url: urls.UpdateTaskStatusUrl(widget.taskModel.id!, status),
+    NetworkResponse response = await Netcontroller.getRequest(
+      url: urls.UpdateTaskStatusUrl(widget.taskModel.id, status),
     );
 
     _updateTaskStatusInProgress = false;
@@ -217,7 +220,7 @@ class _cardState extends State<card> {
       setState(() {});
     }
 
-    NetworkResponse response = await networkCaller.getRequest(
+    NetworkResponse response = await Netcontroller.getRequest(
       url: urls.DeleteTaskUrl(widget.taskModel.id),
     );
 
